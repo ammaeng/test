@@ -1,0 +1,222 @@
+<!DOCTYPE html>
+<html lang="th">
+<head>
+  <meta charset="UTF-8">
+  <title>ระบบทะเบียนผู้ป่วย</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+  <link rel="stylesheet" type="text/css" href="https://cdn.datatables.net/1.13.4/css/dataTables.bootstrap5.min.css">
+  <link href="https://fonts.googleapis.com/css2?family=Sarabun:wght@300;400;600&display=swap" rel="stylesheet">
+  <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
+  <style>
+    body { background-color: #f0f2f5; font-family: 'Sarabun', sans-serif; }
+    .container-fluid { padding: 20px; }
+    .card { border: none; border-radius: 12px; box-shadow: 0 4px 12px rgba(0,0,0,0.08); margin-bottom: 20px; }
+    .section-title { background-color: #0d6efd; color: white; padding: 12px 20px; border-radius: 12px 12px 0 0; font-weight: 600; }
+    .nav-tabs .nav-link.active { color: #0d6efd; border-bottom: 3px solid #0d6efd; font-weight: 600; }
+  </style>
+</head>
+<body>
+
+<div class="container-fluid">
+  <div class="d-flex justify-content-between align-items-center mb-4">
+    <h3 class="text-primary fw-bold">ระบบทะเบียนผู้ป่วย (Cloud)</h3>
+    <div id="currentTime" class="text-muted small"></div>
+  </div>
+
+  <ul class="nav nav-tabs mb-4" id="mainTab">
+    <li class="nav-item"><button class="nav-link active" data-bs-toggle="tab" data-bs-target="#list-pane" onclick="loadDashboard()">แดชบอร์ด</button></li>
+    <li class="nav-item"><button class="nav-link" data-bs-toggle="tab" data-bs-target="#form-pane" onclick="prepareNewForm()">ลงทะเบียน / แก้ไข</button></li>
+  </ul>
+
+  <div class="tab-content">
+    <!-- TAB 1: DASHBOARD -->
+    <div class="tab-pane fade show active" id="list-pane">
+      <div class="row mb-4 text-center">
+        <div class="col-md-4"><div class="card bg-primary text-white p-3"><h5>ทั้งหมด</h5><h2 id="totalCount">0</h2></div></div>
+        <div class="col-md-4"><div class="card bg-warning text-dark p-3"><h5>กำลังรักษา</h5><h2 id="activeCount">0</h2></div></div>
+        <div class="col-md-4"><div class="card bg-success text-white p-3"><h5>จำหน่ายแล้ว</h5><h2 id="dcCount">0</h2></div></div>
+      </div>
+      <div class="card p-3">
+        <table id="patientTable" class="table table-hover w-100">
+          <thead><tr><th>ลำดับ</th><th>HN</th><th>ชื่อ-นามสกุล</th><th>Ward</th><th>วันที่รับ</th><th>สถานะ</th><th>จัดการ</th></tr></thead>
+          <tbody id="tableBody"></tbody>
+        </table>
+      </div>
+    </div>
+
+    <!-- TAB 2: FORM -->
+    <div class="tab-pane fade" id="form-pane">
+      <form id="dataForm">
+        <input type="hidden" id="rowId">
+        <!-- ข้อมูลการรับเข้า -->
+        <div class="card">
+          <div class="section-title" id="formHeader">ข้อมูลการรับเข้า</div>
+          <div class="card-body row">
+            <div class="col-md-2 mb-3"><label class="form-label">ลำดับ</label><input type="text" class="form-control bg-light" id="seq" readonly></div>
+            <div class="col-md-3 mb-3"><label class="form-label">ประเภท</label><select class="form-select" id="inType" required><option value="รับใหม่">รับใหม่</option><option value="รับย้าย">รับย้าย</option><option value="รับ Refer">รับ Refer</option></select></div>
+            <div class="col-md-3 mb-3"><label class="form-label">วันที่รับ</label><input type="date" class="form-control" id="inDate" required onchange="calculateLOS()"></div>
+            <div class="col-md-2 mb-3"><label class="form-label">เวลา</label><input type="time" class="form-control" id="inTime" required></div>
+            <div class="col-md-2 mb-3"><label class="form-label">แผนกต้นทาง</label><input type="text" class="form-control" id="inDept"></div>
+          </div>
+        </div>
+        <!-- ข้อมูลผู้ป่วย -->
+        <div class="card">
+          <div class="section-title bg-info text-white">ข้อมูลผู้ป่วย</div>
+          <div class="card-body row">
+            <div class="col-md-6 mb-3"><label class="form-label">ชื่อ-นามสกุล</label><input type="text" class="form-control" id="patientName" required></div>
+            <div class="col-md-2 mb-3"><label class="form-label">ปี</label><input type="number" class="form-control" id="ageYear" value="0"></div>
+            <div class="col-md-2 mb-3"><label class="form-label">เดือน</label><input type="number" class="form-control" id="ageMonth" value="0"></div>
+            <div class="col-md-2 mb-3"><label class="form-label">วัน</label><input type="number" class="form-control" id="ageDay" value="0"></div>
+            <div class="col-md-3 mb-3"><label class="form-label">HN</label><input type="text" class="form-control" id="hn" onblur="formatHNAN('hn')"></div>
+            <div class="col-md-3 mb-3"><label class="form-label">AN</label><input type="text" class="form-control" id="an" onblur="formatHNAN('an')"></div>
+            <div class="col-md-3 mb-3"><label class="form-label">Ward</label><select class="form-select" id="ward"></select></div>
+            <div class="col-md-3 mb-3"><label class="form-label">สิทธิ</label><select class="form-select" id="sithi"></select></div>
+            <div class="col-md-12 mb-3"><label class="form-label">ที่อยู่</label><input type="text" class="form-control" id="address"></div>
+          </div>
+        </div>
+        <!-- การรักษา/จำหน่าย -->
+        <div class="card border-warning">
+          <div class="section-title bg-warning text-dark">การจำหน่าย</div>
+          <div class="card-body row">
+            <div class="col-md-3 mb-3"><label class="form-label">D/C วันที่</label><input type="date" class="form-control" id="dcDate" onchange="calculateLOS()"></div>
+            <div class="col-md-3 mb-3"><label class="form-label">Admit < 6 ชม.</label><input type="text" class="form-control" id="admitUnder6" onkeyup="calculateLOS()"></div>
+            <div class="col-md-3 mb-3"><label class="form-label">วันนอน (LOS)</label><input type="text" class="form-control fw-bold text-danger" id="los" readonly></div>
+            <div class="col-md-3 mb-3"><label class="form-label">ตาย (วันที่)</label><input type="date" class="form-control" id="deathDate" onchange="calculateLOS()"></div>
+            <div class="col-md-4 mb-3"><label class="form-label">Refer Out วันที่</label><input type="date" class="form-control" id="referOutDate" onchange="calculateLOS()"></div>
+            <div class="col-md-8 mb-3"><label class="form-label">Refer ไปที่</label><input type="text" class="form-control" id="referDestination"></div>
+          </div>
+        </div>
+        <div class="text-center mt-4"><button type="submit" class="btn btn-primary btn-lg rounded-pill" id="btnSubmit">บันทึก</button></div>
+      </form>
+    </div>
+  </div>
+</div>
+
+<script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
+<script src="https://cdn.datatables.net/1.13.4/js/jquery.dataTables.min.js"></script>
+<script src="https://cdn.datatables.net/1.13.4/js/dataTables.bootstrap5.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+
+<script>
+  // !!! สำคัญ: แก้ไข URL นี้ให้เป็น URL ของคุณ !!!
+  const SCRIPT_URL = "https://script.google.com/macros/s/AKfycbxOn3oPPc8BZnTdLMZzMxFOV1muQM2DvTsKZ-VJkDNhXW42TKeEXM-XNFcRk1T5waw/exec"; 
+
+  let dataTable;
+
+  async function callApi(action, data = null) {
+    const response = await fetch(SCRIPT_URL, {
+      method: 'POST',
+      body: JSON.stringify({ action, data })
+    });
+    const res = await response.json();
+    if (res.status === 'success') return res.data;
+    throw new Error(res.message);
+  }
+
+  document.addEventListener("DOMContentLoaded", () => {
+    callApi('getDropdownData').then(populateDropdowns);
+    loadDashboard();
+    setInterval(() => { document.getElementById('currentTime').innerText = new Date().toLocaleString('th-TH'); }, 1000);
+  });
+
+  function populateDropdowns(data) {
+    fillSelect('ward', data.ward);
+    fillSelect('sithi', data.sithi);
+  }
+
+  function fillSelect(id, items) {
+    const el = document.getElementById(id);
+    el.innerHTML = '<option value="">-- เลือก --</option>';
+    items.forEach(i => el.innerHTML += `<option value="${i}">${i}</option>`);
+  }
+
+  function formatHNAN(id) {
+    let input = document.getElementById(id);
+    let val = input.value.replace(/-/g, '').trim();
+    if (val.length >= 3) input.value = val.slice(0, -2) + '-' + val.slice(-2);
+  }
+
+  function calculateLOS() {
+    if (document.getElementById('admitUnder6').value) { document.getElementById('los').value = "0"; return; }
+    const start = document.getElementById('inDate').value;
+    const end = document.getElementById('dcDate').value || document.getElementById('deathDate').value || document.getElementById('referOutDate').value;
+    if (start && end) {
+      const diff = Math.ceil(Math.abs(new Date(end) - new Date(start)) / (1000 * 60 * 60 * 24));
+      document.getElementById('los').value = diff;
+    } else { document.getElementById('los').value = ""; }
+  }
+
+  function loadDashboard() {
+    Swal.fire({ title: 'กำลังโหลด...', didOpen: () => Swal.showLoading() });
+    callApi('getAllData').then(data => {
+      if (dataTable) dataTable.destroy();
+      let html = '', total = data.length, active = 0, dc = 0;
+      data.forEach(item => {
+        if (item.status === 'จำหน่ายแล้ว') dc++; else active++;
+        html += `<tr><td>${item.seq}</td><td>${item.hn}</td><td>${item.patientName}</td><td>${item.ward}</td><td>${item.inDate}</td>
+          <td><span class="badge ${item.status==='จำหน่ายแล้ว'?'bg-success':'bg-warning text-dark'}">${item.status}</span></td>
+          <td><div class="btn-group"><button class="btn btn-sm btn-outline-primary" onclick='editPatient(${JSON.stringify(item)})'>แก้ไข</button>
+          <button class="btn btn-sm btn-outline-danger" onclick='printPDF(${JSON.stringify(item)})'>PDF</button></div></td></tr>`;
+      });
+      document.getElementById('totalCount').innerText = total;
+      document.getElementById('activeCount').innerText = active;
+      document.getElementById('dcCount').innerText = dc;
+      document.getElementById('tableBody').innerHTML = html;
+      dataTable = $('#patientTable').DataTable({ order: [[0, 'desc']] });
+      Swal.close();
+    });
+  }
+
+  function editPatient(item) {
+    const raw = item.rawData;
+    document.getElementById('rowId').value = item.rowId;
+    document.getElementById('patientName').value = raw[10];
+    document.getElementById('hn').value = raw[12];
+    document.getElementById('an').value = raw[13];
+    document.getElementById('inType').value = item.inType;
+    document.getElementById('address').value = raw[30];
+    new bootstrap.Tab(document.querySelector('button[data-bs-target="#form-pane"]')).show();
+  }
+
+  document.getElementById('dataForm').addEventListener('submit', async (e) => {
+    e.preventDefault();
+    Swal.fire({ title: 'กำลังบันทึก...', allowOutsideClick: false, didOpen: () => Swal.showLoading() });
+    const formData = {
+      rowId: document.getElementById('rowId').value,
+      seq: document.getElementById('seq').value,
+      patientName: document.getElementById('patientName').value,
+      hn: document.getElementById('hn').value,
+      an: document.getElementById('an').value,
+      ward: document.getElementById('ward').value,
+      address: document.getElementById('address').value,
+      los: document.getElementById('los').value,
+      inDate: document.getElementById('inDate').value,
+      inTime: document.getElementById('inTime').value,
+      // (Mapping ข้อมูลอื่นๆ ตามหัวข้อใน formData ของ Google Apps Script)
+    };
+    await callApi('processData', formData);
+    Swal.fire('สำเร็จ', 'บันทึกเรียบร้อย', 'success');
+    loadDashboard();
+    new bootstrap.Tab(document.querySelector('button[data-bs-target="#list-pane"]')).show();
+  });
+
+  function printPDF(item) {
+    Swal.fire({ title: 'กำลังสร้าง PDF...', didOpen: () => Swal.showLoading() });
+    const raw = item.rawData;
+    const pdfData = { patientName: raw[10], hn: raw[12], an: raw[13], age: raw[11], address: raw[30], dischargeStatus: item.status, los: raw[22] };
+    callApi('createPatientPDF', pdfData).then(base64 => {
+      Swal.close();
+      const win = window.open();
+      win.document.write(`<iframe src="data:application/pdf;base64,${base64}" style="width:100%;height:100%;border:none;"></iframe>`);
+    });
+  }
+
+  function prepareNewForm() {
+    document.getElementById('dataForm').reset();
+    document.getElementById('rowId').value = "";
+    callApi('getNextSeq').then(s => document.getElementById('seq').value = s);
+  }
+</script>
+</body>
+</html>
