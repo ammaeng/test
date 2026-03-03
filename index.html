@@ -87,8 +87,11 @@
             <div class="col-md-3 mb-3"><label class="form-label">HN</label><input type="text" class="form-control" id="hn"></div>
             <div class="col-md-3 mb-3"><label class="form-label">AN</label><input type="text" class="form-control" id="an"></div>
             <div class="col-md-3 mb-3"><label class="form-label">Ward (แผนก)</label><select class="form-select" id="ward"></select></div>
-            <div class="col-md-3 mb-3"><label class="form-label">สาย (Line)</label><input type="text" class="form-control" id="sai"></div>
-            <div class="col-md-4 mb-3"><label class="form-label">สิทธิการรักษา</label><select class="form-select" id="sithi"></select></div>
+<!-- ค้นหาและเปลี่ยนบรรทัดนี้ -->
+<div class="col-md-3 mb-3">
+  <label class="form-label">สาย (Line)</label>
+  <select class="form-select" id="sai"></select> <!-- เปลี่ยนจาก input เป็น select -->
+</div>            <div class="col-md-4 mb-3"><label class="form-label">สิทธิการรักษา</label><select class="form-select" id="sithi"></select></div>
             <div class="col-md-4 mb-3"><label class="form-label">Dx. แรก</label><input type="text" class="form-control" id="dx1"></div>
             <div class="col-md-4 mb-3"><label class="form-label">Dx. หลัง</label><input type="text" class="form-control" id="dx2"></div>
             <div class="col-md-12 mb-3"><label class="form-label">ที่อยู่</label><input type="text" class="form-control" id="address"></div>
@@ -162,10 +165,12 @@
     setInterval(() => { document.getElementById('currentTime').innerText = new Date().toLocaleString('th-TH'); }, 1000);
   });
 
-  function populateDropdowns(data) {
-    fillSelect('ward', data.ward);
-    fillSelect('sithi', data.sithi);
-  }
+// แก้ไขฟังก์ชัน populateDropdowns ให้เป็นแบบนี้
+function populateDropdowns(data) {
+  fillSelect('ward', data.ward);
+  fillSelect('sithi', data.sithi);
+  fillSelect('sai', data.sai); // เพิ่มบรรทัดนี้เพื่อดึงค่า "สาย" มาใส่ใน Dropdown
+}
 
   function fillSelect(id, items) {
     const el = document.getElementById(id);
