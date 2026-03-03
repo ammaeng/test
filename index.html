@@ -201,12 +201,14 @@
     });
   }
 
+// --- ฟังก์ชันดึงข้อมูลมาแก้ไข ---
   function editPatient(item) {
-    const raw = item.rawData;
-    document.getElementById('rowId').value = item.rowId;
-    document.getElementById('seq').value = item.seq;
+    const raw = item.rawData; // ข้อมูลดิบจากแถวใน Sheet (31 คอลัมน์)
     
-    // 1. จัดการวันที่รับเข้า (Inbound)
+    document.getElementById('rowId').value = item.rowId;
+    document.getElementById('seq').value = raw[0];
+    
+    // 1. จัดการวันที่รับเข้า (เช็คว่าช่องไหนมีข้อมูล: รับใหม่/รับย้าย/รับ Refer)
     let inType = "รับใหม่", inDate = raw[1], inTime = raw[2], inDept = raw[3];
     if (raw[4]) { inType = "รับย้าย"; inDate = raw[4]; inTime = raw[5]; inDept = raw[6]; }
     else if (raw[7]) { inType = "รับ Refer"; inDate = raw[7]; inTime = raw[8]; inDept = raw[9]; }
@@ -216,27 +218,94 @@
     document.getElementById('inTime').value = formatTimeForInput(inTime);
     document.getElementById('inDept').value = inDept;
 
-    // 2. ข้อมูลผู้ป่วย (ดึงเฉพาะตัวเลขจากช่องอายุ)
+    // 2. ข้อมูลผู้ป่วย
     document.getElementById('patientName').value = raw[10];
-    document.getElementById('ageYear').value = parseInt(raw[11]) || 0; 
+    document.getElementById('ageYear').value = parseInt(raw[11]) || 0; // อายุ (ช่องที่ 12)
     document.getElementById('hn').value = raw[12];
     document.getElementById('an').value = raw[13];
     document.getElementById('ward').value = raw[14];
-    document.getElementById('sithi').value = raw[16];
-    document.getElementById('address').value = raw[30];
+    document.getElementById('sithi').value = raw[16]; // สิทธิ (ช่องที่ 17)
+    document.getElementById('address').value = raw[30]; // ที่อยู่ (ช่องที่ 31)
 
-    // 3. ข้อมูลการจำหน่าย (ดึงวันที่จากคอลัมน์ที่ถูกต้อง)
-    document.getElementById('dcDate').value = formatDateForInput(raw[19]);
+    // 3. ข้อมูลการจำหน่าย/ตาย/Refer
+    document.getElementById('dcDate').value = formatDateForInput(raw[19]); // D/C (ช่องที่ 20)
     document.getElementById('admitUnder6').value = raw[21];
     document.getElementById('los').value = raw[22];
-    document.getElementById('referOutDate').value = formatDateForInput(raw[27]);
-    document.getElementById('referDestination').value = raw[28];
-    document.getElementById('deathDate').value = formatDateForInput(raw[29]);
+    document.getElementById('referOutDate').value = formatDateForInput(raw[27]); // Refer (ช่องที่ 28)
+    document.getElementById('referDestination').value = raw[28]; // รพ.ปลายทาง (ช่องที่ 29)
+    document.getElementById('deathDate').value = formatDateForInput(raw[29]); // ตาย (ช่องที่ 30)
 
+    // เปิดหน้าฟอร์ม
     new bootstrap.Tab(document.querySelector('button[data-bs-target="#form-pane"]')).show();
     document.getElementById('formHeader').innerText = "แก้ไขข้อมูล: " + raw[10];
   }
 
+  // --- ฟังก์ชันบันทึกข้อมูล ---
+  document.getElementById('dataForm').addEventListener('submit', async (e) => {
+    e.preventDefault();
+    Swal.fire({ title: 'กำลังบันทึก...', allowOutsideClick: false, didOpen: () => Swal.showLoading() });
+
+    const inType = document.getElementById('inType').value;
+    const inDate = formatDateForSheet(document.getElementById('inDate').value);
+    const inTime = document.getElementById('inTime').value;
+    const inDept = document.getElementById('inDept').value;
+
+    const formData = {
+      rowId: document.getElementById('rowId').value,
+      seq: document.getElementById('seq').value,
+      patientName: document.getElementById('patientName').value,
+      age: document.getElementById('ageYear').value,
+      hn: document.getElementById('hn').value,
+      an: document.getElementById('an').value,
+      ward: document.getElementById('ward').value,
+      sithi: document.getElementById('sithi').value,
+      address: document.getElementById('address').value,
+      los: document.getElementById('los').value,
+      admitUnder6: document.getElementById('admitUnder6').value,
+      referDestination: document.getElementById('referDestination').value,
+      dcDate: formatDateForSheet(document.getElementById('dcDate').value),
+      deathDate: formatDateForSheet(document.getElementById('deathDate').value),
+      referOutDate: formatDateForSheet(document.getElementById('referOutDate').value)
+    };
+
+    // ใส่ข้อมูลลงฟิลด์ตามประเภทการรับเข้า
+    if (inType === "รับใหม่") { formData.newMark = inDate; formData.newTime = inTime; formData.newDept = inDept; }
+    else if (inType === "รับย้าย") { formData.transferMark = inDate; formData.transferTime = inTime; formData.transferDept = inDept; }
+    else { formData.referMark = inDate; formData.referTime = inTime; formData.referDept = inDept; }
+
+    try {
+      await callApi('processData', formData);
+      Swal.fire('สำเร็จ', 'บันทึกเรียบร้อย', 'success');
+      loadDashboard();
+      new bootstrap.Tab(document.querySelector('button[data-bs-target="#list-pane"]')).show();
+    } catch (err) {
+      Swal.fire('ผิดพลาด', err.message, 'error');
+    }
+  });
+
+  // --- ฟังก์ชันจัดการรูปแบบวันที่ (พ.ศ. <-> ค.ศ.) ---
+  function formatDateForInput(dateStr) {
+    if (!dateStr || !dateStr.includes('/')) return "";
+    const parts = dateStr.split('/');
+    let d = parts[0].padStart(2, '0');
+    let m = parts[1].padStart(2, '0');
+    let y = parseInt(parts[2]);
+    if (y > 2400) y -= 543; // แปลง พ.ศ. เป็น ค.ศ. เพื่อแสดงในปฏิทิน HTML
+    return `${y}-${m}-${d}`;
+  }
+
+  function formatDateForSheet(dateVal) {
+    if (!dateVal) return "";
+    const parts = dateVal.split('-');
+    return `${parts[2]}/${parts[1]}/${parseInt(parts[0]) + 543}`; // แปลง ค.ศ. เป็น พ.ศ. ก่อนลง Sheet
+  }
+
+  function formatTimeForInput(timeStr) {
+    if (!timeStr) return "";
+    let clean = timeStr.trim().replace('.', ':');
+    let parts = clean.split(':');
+    return parts.length >= 2 ? `${parts[0].padStart(2, '0')}:${parts[1].padStart(2, '0')}` : "";
+  }
   // --- Submit Form (Single Listener) ---
   document.getElementById('dataForm').addEventListener('submit', async (e) => {
     e.preventDefault();
