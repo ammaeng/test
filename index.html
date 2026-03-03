@@ -390,19 +390,48 @@ function populateDropdowns(data) {
     new bootstrap.Tab(document.querySelector('button[data-bs-target="#form-pane"]')).show();
   }
 
-  function printPDF(item) {
+function printPDF(item) {
+    // 1. เปิดหน้าต่างใหม่รอไว้ทันทีเพื่อเลี่ยงการโดนบล็อก Pop-up
+    const win = window.open("", "_blank");
+    if (!win) {
+      Swal.fire('แจ้งเตือน', 'กรุณาอนุญาตให้เบราว์เซอร์เปิด Pop-up เพื่อดู PDF', 'warning');
+      return;
+    }
+    win.document.write('<html><body><p style="font-family:Sarabun">กำลังเตรียมเอกสาร PDF... กรุณารอสักครู่</p></body></html>');
+
     Swal.fire({ title: 'กำลังสร้าง PDF...', allowOutsideClick: false, didOpen: () => Swal.showLoading() });
+
     const raw = item.rawData;
     const pdfData = { 
-      patientName: raw[10], hn: raw[12], an: raw[13], age: raw[11], 
-      address: raw[30], dischargeStatus: item.status, los: raw[22],
-      inType: item.inType, date: item.inDate, ward: raw[14],
-      sithi: raw[16], dx2: raw[18], seq: raw[0]
+      patientName: raw[10], 
+      hn: raw[12], 
+      an: raw[13], 
+      age: raw[11], 
+      address: raw[30], 
+      dischargeStatus: item.status, 
+      los: raw[22],
+      inType: item.inType || "ไม่ระบุ", 
+      date: item.inDate, 
+      ward: raw[14],
+      sithi: raw[16], 
+      dx2: raw[18], 
+      seq: raw[0]
     };
+
+    // 2. เรียก API เพื่อสร้าง Base64 ของ PDF
     callApi('createPatientPDF', pdfData).then(base64 => {
       Swal.close();
-      const win = window.open();
-      win.document.write(`<iframe src="data:application/pdf;base64,${base64}" style="width:100%;height:100%;border:none;"></iframe>`);
+      // 3. เขียนข้อมูลลงในหน้าต่างที่เปิดรอไว้
+      win.document.body.innerHTML = ""; // ล้างข้อความ Loading
+      win.document.write(`
+        <title>Patient_Report_${pdfData.hn}</title>
+        <style>body { margin: 0; }</style>
+        <iframe src="data:application/pdf;base64,${base64}" style="width:100%; height:100vh; border:none;"></iframe>
+      `);
+    }).catch(err => {
+      Swal.close();
+      win.close(); // ปิดหน้าต่างที่เปิดรอไว้ถ้าเกิดข้อผิดพลาด
+      Swal.fire('ผิดพลาด', 'ไม่สามารถสร้าง PDF ได้: ' + err.message, 'error');
     });
   }
 </script>
