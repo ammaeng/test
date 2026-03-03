@@ -109,10 +109,8 @@
 
 <script>
   const SCRIPT_URL = "https://script.google.com/macros/s/AKfycbxOn3oPPc8BZnTdLMZzMxFOV1muQM2DvTsKZ-VJkDNhXW42TKeEXM-XNFcRk1T5waw/exec"; 
-
   let dataTable;
 
-  // --- API Helper ---
   async function callApi(action, data = null) {
     const response = await fetch(SCRIPT_URL, {
       method: 'POST',
@@ -123,7 +121,6 @@
     throw new Error(res.message);
   }
 
-  // --- Initialization ---
   document.addEventListener("DOMContentLoaded", () => {
     callApi('getDropdownData').then(populateDropdowns);
     loadDashboard();
@@ -141,46 +138,37 @@
     items.forEach(i => el.innerHTML += `<option value="${i}">${i}</option>`);
   }
 
-  // --- Date/Time Helpers ---
-
-  // แปลงจาก 01/02/2569 (Sheet) -> 2026-02-01 (HTML Input)
+  // --- Date Helpers ---
   function formatDateForInput(dateStr) {
     if (!dateStr || !dateStr.includes('/')) return "";
     const parts = dateStr.split('/');
-    if (parts.length === 3) {
-      let d = parts[0].padStart(2, '0');
-      let m = parts[1].padStart(2, '0');
-      let y = parseInt(parts[2]);
-      if (y > 2400) y -= 543; // แปลง พ.ศ. เป็น ค.ศ.
-      return `${y}-${m}-${d}`;
-    }
-    return "";
+    let y = parseInt(parts[2]);
+    if (y > 2400) y -= 543;
+    return `${y}-${parts[1].padStart(2, '0')}-${parts[0].padStart(2, '0')}`;
   }
 
-  // แปลงจาก 2026-02-01 (HTML Input) -> 01/02/2569 (Sheet)
   function formatDateForSheet(dateVal) {
     if (!dateVal) return "";
     const parts = dateVal.split('-');
-    if (parts.length === 3) {
-      return `${parts[2]}/${parts[1]}/${parseInt(parts[0]) + 543}`;
-    }
-    return "";
+    return `${parts[2]}/${parts[1]}/${parseInt(parts[0]) + 543}`;
   }
 
   function formatTimeForInput(timeStr) {
     if (!timeStr) return "";
-    let cleanTime = timeStr.trim().replace('.', ':');
-    let parts = cleanTime.split(':');
-    if (parts.length >= 2) return `${parts[0].padStart(2, '0')}:${parts[1].padStart(2, '0')}`;
-    return "";
+    let clean = timeStr.trim().replace('.', ':');
+    let parts = clean.split(':');
+    return parts.length >= 2 ? `${parts[0].padStart(2, '0')}:${parts[1].padStart(2, '0')}` : "";
   }
 
-  // --- Business Logic ---
-
+  // --- Logic ---
   function calculateLOS() {
-    if (document.getElementById('admitUnder6').value) { document.getElementById('los').value = "0"; return; }
-    const start = document.getElementById('inDate').value; 
-    const end = document.getElementById('dcDate').value || document.getElementById('deathDate').value || document.getElementById('referOutDate').value;
+    const start = document.getElementById('inDate').value;
+    const end = document.getElementById('dcDate').value || 
+                document.getElementById('transferOutDate').value || 
+                document.getElementById('deathDate').value || 
+                document.getElementById('referOutDate').value ||
+                document.getElementById('abscondDate').value ||
+                document.getElementById('refuseDate').value;
     if (start && end) {
       const diff = Math.ceil(Math.abs(new Date(end) - new Date(start)) / (1000 * 60 * 60 * 24));
       document.getElementById('los').value = diff;
@@ -210,25 +198,21 @@
     });
   }
 
-// --- ฟังก์ชันดึงข้อมูลมาแก้ไข ---
-// --- ฟังก์ชันดึงข้อมูลมาแก้ไข ---
-// --- ฟังก์ชันดึงข้อมูลมาแก้ไข (Mapping 31 คอลัมน์) ---
   function editPatient(item) {
     const raw = item.rawData;
     document.getElementById('rowId').value = item.rowId;
     document.getElementById('seq').value = raw[0];
     
-    // จัดการการรับเข้า (1-9)
+    // Mapping 1-9
     let inType = "รับใหม่", inDate = raw[1], inTime = raw[2], inDept = raw[3];
     if (raw[4]) { inType = "รับย้าย"; inDate = raw[4]; inTime = raw[5]; inDept = raw[6]; }
     else if (raw[7]) { inType = "รับ Refer"; inDate = raw[7]; inTime = raw[8]; inDept = raw[9]; }
-
     document.getElementById('inType').value = inType;
     document.getElementById('inDate').value = formatDateForInput(inDate);
     document.getElementById('inTime').value = formatTimeForInput(inTime);
     document.getElementById('inDept').value = inDept;
 
-    // ข้อมูลผู้ป่วย (10-16)
+    // Mapping 10-16
     document.getElementById('patientName').value = raw[10];
     document.getElementById('ageYear').value = parseInt(raw[11]) || 0;
     document.getElementById('hn').value = raw[12];
@@ -236,7 +220,7 @@
     document.getElementById('ward').value = raw[14];
     document.getElementById('sithi').value = raw[16];
 
-    // ข้อมูลการจำหน่าย (19-29) ตามคอลัมน์ที่คุณแจ้งมา
+    // Mapping 19-30
     document.getElementById('dcDate').value = formatDateForInput(raw[19]);
     document.getElementById('fu').value = raw[20];
     document.getElementById('admitUnder6').value = raw[21];
@@ -248,15 +232,13 @@
     document.getElementById('referOutDate').value = formatDateForInput(raw[27]);
     document.getElementById('referDestination').value = raw[28];
     document.getElementById('deathDate').value = formatDateForInput(raw[29]);
-    
-    // ที่อยู่ (30)
     document.getElementById('address').value = raw[30];
 
     new bootstrap.Tab(document.querySelector('button[data-bs-target="#form-pane"]')).show();
     document.getElementById('formHeader').innerText = "แก้ไขข้อมูล: " + raw[10];
   }
 
-  // --- ฟังก์ชันบันทึกข้อมูล ---
+  // ตัวบันทึกข้อมูล (มีแค่อันเดียว)
   document.getElementById('dataForm').addEventListener('submit', async (e) => {
     e.preventDefault();
     Swal.fire({ title: 'กำลังบันทึก...', allowOutsideClick: false, didOpen: () => Swal.showLoading() });
@@ -272,22 +254,21 @@
       ward: document.getElementById('ward').value,
       sithi: document.getElementById('sithi').value,
       address: document.getElementById('address').value,
-      
-      // การจำหน่าย
-      dcDate: formatDateForSheet(document.getElementById('dcDate').value),
+      los: document.getElementById('los').value,
       fu: document.getElementById('fu').value,
       admitUnder6: document.getElementById('admitUnder6').value,
-      los: document.getElementById('los').value,
       transferOut: document.getElementById('transferOut').value,
+      referDestination: document.getElementById('referDestination').value,
+      
+      // แปลงวันที่ พ.ศ. ทั้งหมดก่อนส่ง
+      dcDate: formatDateForSheet(document.getElementById('dcDate').value),
       transferOutDate: formatDateForSheet(document.getElementById('transferOutDate').value),
       abscondDate: formatDateForSheet(document.getElementById('abscondDate').value),
       refuseDate: formatDateForSheet(document.getElementById('refuseDate').value),
       referOutDate: formatDateForSheet(document.getElementById('referOutDate').value),
-      referDestination: document.getElementById('referDestination').value,
       deathDate: formatDateForSheet(document.getElementById('deathDate').value)
     };
 
-    // จัดการวันที่รับเข้า
     const iDate = formatDateForSheet(document.getElementById('inDate').value);
     const iTime = document.getElementById('inTime').value;
     const iDept = document.getElementById('inDept').value;
@@ -301,203 +282,6 @@
       loadDashboard();
       new bootstrap.Tab(document.querySelector('button[data-bs-target="#list-pane"]')).show();
     } catch (err) { Swal.fire('ผิดพลาด', err.message, 'error'); }
-  });
-
-  // --- คำนวณ LOS (หากมีวันจำหน่ายใดๆ ให้คำนวณ) ---
-  function calculateLOS() {
-    const start = document.getElementById('inDate').value;
-    const end = document.getElementById('dcDate').value || 
-                document.getElementById('transferOutDate').value || 
-                document.getElementById('deathDate').value || 
-                document.getElementById('referOutDate').value ||
-                document.getElementById('abscondDate').value ||
-                document.getElementById('refuseDate').value;
-
-    if (start && end) {
-      const diff = Math.ceil(Math.abs(new Date(end) - new Date(start)) / (1000 * 60 * 60 * 24));
-      document.getElementById('los').value = diff;
-    } else { document.getElementById('los').value = ""; }
-  }
-  // --- ฟังก์ชันบันทึกข้อมูล ---
-  document.getElementById('dataForm').addEventListener('submit', async (e) => {
-    e.preventDefault();
-    Swal.fire({ title: 'กำลังบันทึก...', allowOutsideClick: false, didOpen: () => Swal.showLoading() });
-
-    const inType = document.getElementById('inType').value;
-    const inDate = formatDateForSheet(document.getElementById('inDate').value);
-    const inTime = document.getElementById('inTime').value;
-    const inDept = document.getElementById('inDept').value;
-
-    const formData = {
-      rowId: document.getElementById('rowId').value,
-      seq: document.getElementById('seq').value,
-      patientName: document.getElementById('patientName').value,
-      age: document.getElementById('ageYear').value, 
-      hn: document.getElementById('hn').value,
-      an: document.getElementById('an').value,
-      ward: document.getElementById('ward').value,
-      sithi: document.getElementById('sithi').value,
-      address: document.getElementById('address').value,
-      los: document.getElementById('los').value,
-      admitUnder6: document.getElementById('admitUnder6').value,
-      referDestination: document.getElementById('referDestination').value,
-      
-      // แปลงวันที่กลับเป็น พ.ศ. ก่อนส่งลง Sheet
-      dcDate: formatDateForSheet(document.getElementById('dcDate').value),
-      deathDate: formatDateForSheet(document.getElementById('deathDate').value),
-      referOutDate: formatDateForSheet(document.getElementById('referOutDate').value)
-    };
-
-    // ใส่ข้อมูลตามช่องรับเข้า
-    if (inType === "รับใหม่") { formData.newMark = inDate; formData.newTime = inTime; formData.newDept = inDept; }
-    else if (inType === "รับย้าย") { formData.transferMark = inDate; formData.transferTime = inTime; formData.transferDept = inDept; }
-    else { formData.referMark = inDate; formData.referTime = inTime; formData.referDept = inDept; }
-
-    try {
-      await callApi('processData', formData);
-      Swal.fire('สำเร็จ', 'บันทึกข้อมูลเรียบร้อย', 'success');
-      loadDashboard();
-      new bootstrap.Tab(document.querySelector('button[data-bs-target="#list-pane"]')).show();
-    } catch (err) {
-      Swal.fire('ผิดพลาด', err.message, 'error');
-    }
-  });
-
-  // --- Helpers สำหรับจัดการวันที่ ---
-  function formatDateForInput(dateStr) {
-    if (!dateStr || !dateStr.includes('/')) return "";
-    const parts = dateStr.split('/'); // คาดหวัง วัน/เดือน/พ.ศ.
-    if (parts.length === 3) {
-      let d = parts[0].padStart(2, '0');
-      let m = parts[1].padStart(2, '0');
-      let y = parseInt(parts[2]);
-      if (y > 2400) y -= 543; // แปลง พ.ศ. เป็น ค.ศ.
-      return `${y}-${m}-${d}`;
-    }
-    return "";
-  }
-
-  function formatDateForSheet(dateVal) {
-    if (!dateVal) return "";
-    const parts = dateVal.split('-'); // มาจาก input date (yyyy-mm-dd)
-    return `${parts[2]}/${parts[1]}/${parseInt(parts[0]) + 543}`; // แปลงเป็น dd/mm/yyyy พ.ศ.
-  }
-
-  function formatTimeForInput(timeStr) {
-    if (!timeStr) return "";
-    let clean = timeStr.trim().replace('.', ':');
-    let parts = clean.split(':');
-    return parts.length >= 2 ? `${parts[0].padStart(2, '0')}:${parts[1].padStart(2, '0')}` : "";
-  }
-  // --- ฟังก์ชันบันทึกข้อมูล ---
-  document.getElementById('dataForm').addEventListener('submit', async (e) => {
-    e.preventDefault();
-    Swal.fire({ title: 'กำลังบันทึก...', allowOutsideClick: false, didOpen: () => Swal.showLoading() });
-
-    const inType = document.getElementById('inType').value;
-    const inDate = formatDateForSheet(document.getElementById('inDate').value);
-    const inTime = document.getElementById('inTime').value;
-    const inDept = document.getElementById('inDept').value;
-
-    const formData = {
-      rowId: document.getElementById('rowId').value,
-      seq: document.getElementById('seq').value,
-      patientName: document.getElementById('patientName').value,
-      age: document.getElementById('ageYear').value,
-      hn: document.getElementById('hn').value,
-      an: document.getElementById('an').value,
-      ward: document.getElementById('ward').value,
-      sithi: document.getElementById('sithi').value,
-      address: document.getElementById('address').value,
-      los: document.getElementById('los').value,
-      admitUnder6: document.getElementById('admitUnder6').value,
-      referDestination: document.getElementById('referDestination').value,
-      dcDate: formatDateForSheet(document.getElementById('dcDate').value),
-      deathDate: formatDateForSheet(document.getElementById('deathDate').value),
-      referOutDate: formatDateForSheet(document.getElementById('referOutDate').value)
-    };
-
-    // ใส่ข้อมูลลงฟิลด์ตามประเภทการรับเข้า
-    if (inType === "รับใหม่") { formData.newMark = inDate; formData.newTime = inTime; formData.newDept = inDept; }
-    else if (inType === "รับย้าย") { formData.transferMark = inDate; formData.transferTime = inTime; formData.transferDept = inDept; }
-    else { formData.referMark = inDate; formData.referTime = inTime; formData.referDept = inDept; }
-
-    try {
-      await callApi('processData', formData);
-      Swal.fire('สำเร็จ', 'บันทึกเรียบร้อย', 'success');
-      loadDashboard();
-      new bootstrap.Tab(document.querySelector('button[data-bs-target="#list-pane"]')).show();
-    } catch (err) {
-      Swal.fire('ผิดพลาด', err.message, 'error');
-    }
-  });
-
-  // --- ฟังก์ชันจัดการรูปแบบวันที่ (พ.ศ. <-> ค.ศ.) ---
-  function formatDateForInput(dateStr) {
-    if (!dateStr || !dateStr.includes('/')) return "";
-    const parts = dateStr.split('/');
-    let d = parts[0].padStart(2, '0');
-    let m = parts[1].padStart(2, '0');
-    let y = parseInt(parts[2]);
-    if (y > 2400) y -= 543; // แปลง พ.ศ. เป็น ค.ศ. เพื่อแสดงในปฏิทิน HTML
-    return `${y}-${m}-${d}`;
-  }
-
-  function formatDateForSheet(dateVal) {
-    if (!dateVal) return "";
-    const parts = dateVal.split('-');
-    return `${parts[2]}/${parts[1]}/${parseInt(parts[0]) + 543}`; // แปลง ค.ศ. เป็น พ.ศ. ก่อนลง Sheet
-  }
-
-  function formatTimeForInput(timeStr) {
-    if (!timeStr) return "";
-    let clean = timeStr.trim().replace('.', ':');
-    let parts = clean.split(':');
-    return parts.length >= 2 ? `${parts[0].padStart(2, '0')}:${parts[1].padStart(2, '0')}` : "";
-  }
-  // --- Submit Form (Single Listener) ---
-  document.getElementById('dataForm').addEventListener('submit', async (e) => {
-    e.preventDefault();
-    Swal.fire({ title: 'กำลังบันทึก...', allowOutsideClick: false, didOpen: () => Swal.showLoading() });
-
-    const inType = document.getElementById('inType').value;
-    const inDate = formatDateForSheet(document.getElementById('inDate').value);
-    const inTime = document.getElementById('inTime').value;
-    const inDept = document.getElementById('inDept').value;
-
-    const formData = {
-      rowId: document.getElementById('rowId').value,
-      seq: document.getElementById('seq').value,
-      patientName: document.getElementById('patientName').value,
-      age: document.getElementById('ageYear').value,
-      hn: document.getElementById('hn').value,
-      an: document.getElementById('an').value,
-      ward: document.getElementById('ward').value,
-      sithi: document.getElementById('sithi').value,
-      address: document.getElementById('address').value,
-      los: document.getElementById('los').value,
-      admitUnder6: document.getElementById('admitUnder6').value,
-      referDestination: document.getElementById('referDestination').value,
-      
-      // แปลงวันที่เป็น พ.ศ. ทั้งหมดก่อนส่ง
-      dcDate: formatDateForSheet(document.getElementById('dcDate').value),
-      deathDate: formatDateForSheet(document.getElementById('deathDate').value),
-      referOutDate: formatDateForSheet(document.getElementById('referOutDate').value)
-    };
-
-    // จัดกลุ่มข้อมูลการรับเข้าตามประเภท
-    if (inType === "รับใหม่") { formData.newMark = inDate; formData.newTime = inTime; formData.newDept = inDept; }
-    else if (inType === "รับย้าย") { formData.transferMark = inDate; formData.transferTime = inTime; formData.transferDept = inDept; }
-    else { formData.referMark = inDate; formData.referTime = inTime; formData.referDept = inDept; }
-
-    try {
-      await callApi('processData', formData);
-      Swal.fire('สำเร็จ', 'บันทึกข้อมูลเรียบร้อย', 'success');
-      loadDashboard();
-      new bootstrap.Tab(document.querySelector('button[data-bs-target="#list-pane"]')).show();
-    } catch (err) {
-      Swal.fire('ผิดพลาด', err.message, 'error');
-    }
   });
 
   function prepareNewForm() {
