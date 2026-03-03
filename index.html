@@ -169,31 +169,31 @@
   }
 
 // แก้ไขฟังก์ชัน editPatient ให้ดึงข้อมูลมาแสดงครบทุกช่อง
-  function editPatient(item) {
+function editPatient(item) {
     const raw = item.rawData;
     document.getElementById('rowId').value = item.rowId;
     document.getElementById('seq').value = item.seq;
     
-    // ตรวจสอบประเภทการรับเข้า (เช็คว่าคอลัมน์ไหนมีข้อมูล)
+    // ตรวจสอบประเภทการรับเข้า และดึงเวลาให้ตรงคอลัมน์
     let inType = "รับใหม่";
-    let inDate = raw[1], inTime = raw[2], inDept = raw[3];
-    
-    if (raw[4]) { 
-      inType = "รับย้าย"; inDate = raw[4]; inTime = raw[5]; inDept = raw[6]; 
-    } else if (raw[7]) { 
-      inType = "รับ Refer"; inDate = raw[7]; inTime = raw[8]; inDept = raw[9]; 
+    let inDate = raw[1], inTime = raw[2], inDept = raw[3]; // คอลัมน์ 1,2,3 (รับใหม่)
+
+    if (raw[4] || raw[5]) { // ถ้ามีข้อมูลในช่องรับย้าย
+      inType = "รับย้าย"; 
+      inDate = raw[4]; inTime = raw[5]; inDept = raw[6]; 
+    } else if (raw[7] || raw[8]) { // ถ้ามีข้อมูลในช่องรับ Refer
+      inType = "รับ Refer"; 
+      inDate = raw[7]; inTime = raw[8]; inDept = raw[9]; 
     }
 
+    // กำหนดค่าลง Input
     document.getElementById('inType').value = inType;
     document.getElementById('inDate').value = formatDateForInput(inDate);
-    document.getElementById('inTime').value = inTime;
+    document.getElementById('inTime').value = formatTimeForInput(inTime); // เรียกใช้ตัวแปลงเวลา
     document.getElementById('inDept').value = inDept;
 
     document.getElementById('patientName').value = raw[10];
-    
-    // แยกอายุ (กรณีเก็บเป็นข้อความ หรือต้องคำนวณใหม่)
     document.getElementById('ageYear').value = raw[11] || 0; 
-    
     document.getElementById('hn').value = raw[12];
     document.getElementById('an').value = raw[13];
     document.getElementById('ward').value = raw[14];
@@ -208,17 +208,35 @@
     document.getElementById('referDestination').value = raw[28];
     document.getElementById('deathDate').value = formatDateForInput(raw[29]);
 
-    // เปลี่ยนไปที่ Tab Form
+    // สลับหน้าจอ
     new bootstrap.Tab(document.querySelector('button[data-bs-target="#form-pane"]')).show();
     document.getElementById('formHeader').innerText = "แก้ไขข้อมูล: " + raw[10];
-  }
+}
+// ฟังก์ชันแปลงเวลาจาก Sheet ให้เป็น HH:mm
+function formatTimeForInput(timeStr) {
+    if (!timeStr) return "";
+    // ถ้ามาเป็น HH:mm:ss ให้ตัดเหลือ HH:mm
+    // ถ้ามาเป็น 14.30 ให้เปลี่ยนเป็น 14:30
+    let cleanTime = timeStr.trim().replace('.', ':');
+    let parts = cleanTime.split(':');
+    
+    if (parts.length >= 2) {
+        let hours = parts[0].padStart(2, '0');
+        let minutes = parts[1].padStart(2, '0');
+        return `${hours}:${minutes}`;
+    }
+    return "";
+}
 
-  // ฟังก์ชันช่วยแปลงวันที่จาก DD/MM/YYYY เป็น YYYY-MM-DD เพื่อใส่ใน input type="date"
-  function formatDateForInput(dateStr) {
+// ฟังก์ชันแปลงวันที่ (ใช้ของเดิม หรือเพิ่มถ้ายังไม่มี)
+function formatDateForInput(dateStr) {
     if (!dateStr || !dateStr.includes('/')) return dateStr;
-    const parts = dateStr.split('/');
-    return `${parts[2]}-${parts[1].padStart(2,'0')}-${parts[0].padStart(2,'0')}`;
-  }
+    const parts = dateStr.split('/'); // คาดหวัง DD/MM/YYYY
+    if(parts.length === 3) {
+      return `${parts[2]}-${parts[1].padStart(2,'0')}-${parts[0].padStart(2,'0')}`;
+    }
+    return dateStr;
+}
 
   // แก้ไขส่วนการ Submit Form ให้ส่งข้อมูลครบตามที่ .gs ต้องการ
   document.getElementById('dataForm').addEventListener('submit', async (e) => {
