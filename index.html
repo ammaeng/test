@@ -401,26 +401,32 @@ function printPDF(item) {
     Swal.fire({ title: 'กำลังเตรียมข้อมูล PDF...', allowOutsideClick: false, didOpen: () => Swal.showLoading() });
 
     const raw = item.rawData;
-    // สร้าง Object ข้อมูลให้ครบถ้วนตามคอลัมน์ใน Sheet
+
+    // --- ตรวจสอบประเภทการรับจากข้อมูลดิบ ---
+    let inTypeLabel = "ไม่ระบุ";
+    if (raw[1]) inTypeLabel = "รับใหม่";
+    else if (raw[4]) inTypeLabel = "รับย้าย";
+    else if (raw[7]) inTypeLabel = "รับ Refer";
+
     const pdfData = { 
       seq: raw[0],
-      inType: item.inType,
-      inDate: raw[1] || raw[4] || raw[7],
-      inTime: raw[2] || raw[5] || raw[8],
-      inDept: raw[3] || raw[6] || raw[9],
-      patientName: raw[10],
-      age: raw[11],
-      hn: raw[12],
-      an: raw[13],
-      ward: raw[14],
-      sai: raw[15],
-      sithi: raw[16],
-      dx1: raw[17],
-      dx2: raw[18],
+      inType: inTypeLabel, // ใช้ Label ที่เช็คได้
+      inDate: raw[1] || raw[4] || raw[7] || "-",
+      inTime: raw[2] || raw[5] || raw[8] || "-",
+      inDept: raw[3] || raw[6] || raw[9] || "-",
+      patientName: raw[10] || "-",
+      age: raw[11] || "-",
+      hn: raw[12] || "-",
+      an: raw[13] || "-", // ตรวจสอบ AN
+      ward: raw[14] || "-",
+      sai: raw[15] || "-",
+      sithi: raw[16] || "-",
+      dx1: raw[17] || "-",
+      dx2: raw[18] || "-",
       dcDate: raw[19],
       fu: raw[20],
       admitUnder6: raw[21],
-      los: raw[22],
+      los: raw[22] || "0",
       transferOut: raw[23],
       transferOutDate: raw[24],
       abscondDate: raw[25],
@@ -428,7 +434,7 @@ function printPDF(item) {
       referOutDate: raw[27],
       referDestination: raw[28],
       deathDate: raw[29],
-      address: raw[30],
+      address: raw[30] || "-",
       status: item.status
     };
 
@@ -445,6 +451,8 @@ function printPDF(item) {
       win.close();
       Swal.fire('ผิดพลาด', err.message, 'error');
     });
-  }</script>
+  }
+
+</script>
 </body>
 </html>
