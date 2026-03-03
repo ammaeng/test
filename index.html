@@ -102,8 +102,11 @@
             <div class="col-md-3 mb-3"><label class="form-label">D/C วันที่</label><input type="date" class="form-control" id="dcDate" onchange="calculateLOS()"></div>
             <div class="col-md-3 mb-3"><label class="form-label">วันนอน (LOS)</label><input type="text" class="form-control fw-bold text-danger" id="los" readonly></div>
             <div class="col-md-3 mb-3"><label class="form-label">F/U (นัดตรวจ)</label><input type="text" class="form-control" id="fu"></div>
-            <div class="col-md-3 mb-3"><label class="form-label">Admit < 6 ชม.</label><input type="text" class="form-control" id="admitUnder6" placeholder="ระบุจำนวน ชม."></div>
-            
+<!-- ค้นหาบรรทัดนี้ในไฟล์ HTML ของคุณแล้วแก้ไขเป็นตามนี้ -->
+<div class="col-md-3 mb-3">
+  <label class="form-label">Admit < 6 ชม.</label>
+  <input type="text" class="form-control" id="admitUnder6" placeholder="ระบุจำนวน ชม." oninput="calculateLOS()">
+</div>            
             <div class="col-md-4 mb-3"><label class="form-label">ย้ายไปแผนก</label><input type="text" class="form-control" id="transferOut"></div>
             <div class="col-md-4 mb-3"><label class="form-label">วันที่ย้ายแผนก</label><input type="date" class="form-control" id="transferOutDate" onchange="calculateLOS()"></div>
             <div class="col-md-4 mb-3"><label class="form-label">ตาย (วันที่)</label><input type="date" class="form-control" id="deathDate" onchange="calculateLOS()"></div>
@@ -216,7 +219,17 @@
   }
 
   // --- Logic การคำนวณวันนอน (LOS) ---
+ // --- ค้นหาฟังก์ชัน calculateLOS แล้ววางทับด้วยโค้ดนี้ ---
   function calculateLOS() {
+    const admitUnder6Val = document.getElementById('admitUnder6').value.trim();
+
+    // เงื่อนไขเพิ่มเติม: ถ้ามีการกรอก Admit < 6 ชม. ให้ LOS เป็น 0 ทันที
+    if (admitUnder6Val !== "") {
+      document.getElementById('los').value = "0";
+      return; // จบการทำงาน ไม่ต้องคำนวณวันที่ต่อ
+    }
+
+    // กรณีปกติ: คำนวณจากส่วนต่างของวันที่
     const start = document.getElementById('inDate').value;
     const end = document.getElementById('dcDate').value || 
                 document.getElementById('transferOutDate').value || 
@@ -224,6 +237,7 @@
                 document.getElementById('referOutDate').value ||
                 document.getElementById('abscondDate').value ||
                 document.getElementById('refuseDate').value;
+
     if (start && end) {
       const diff = Math.ceil(Math.abs(new Date(end) - new Date(start)) / (1000 * 60 * 60 * 24));
       document.getElementById('los').value = diff;
