@@ -168,16 +168,106 @@
     });
   }
 
+// แก้ไขฟังก์ชัน editPatient ให้ดึงข้อมูลมาแสดงครบทุกช่อง
   function editPatient(item) {
     const raw = item.rawData;
     document.getElementById('rowId').value = item.rowId;
+    document.getElementById('seq').value = item.seq;
+    
+    // ตรวจสอบประเภทการรับเข้า (เช็คว่าคอลัมน์ไหนมีข้อมูล)
+    let inType = "รับใหม่";
+    let inDate = raw[1], inTime = raw[2], inDept = raw[3];
+    
+    if (raw[4]) { 
+      inType = "รับย้าย"; inDate = raw[4]; inTime = raw[5]; inDept = raw[6]; 
+    } else if (raw[7]) { 
+      inType = "รับ Refer"; inDate = raw[7]; inTime = raw[8]; inDept = raw[9]; 
+    }
+
+    document.getElementById('inType').value = inType;
+    document.getElementById('inDate').value = formatDateForInput(inDate);
+    document.getElementById('inTime').value = inTime;
+    document.getElementById('inDept').value = inDept;
+
     document.getElementById('patientName').value = raw[10];
+    
+    // แยกอายุ (กรณีเก็บเป็นข้อความ หรือต้องคำนวณใหม่)
+    document.getElementById('ageYear').value = raw[11] || 0; 
+    
     document.getElementById('hn').value = raw[12];
     document.getElementById('an').value = raw[13];
-    document.getElementById('inType').value = item.inType;
+    document.getElementById('ward').value = raw[14];
+    document.getElementById('sithi').value = raw[16];
     document.getElementById('address').value = raw[30];
+
+    // ข้อมูลการจำหน่าย
+    document.getElementById('dcDate').value = formatDateForInput(raw[19]);
+    document.getElementById('admitUnder6').value = raw[21];
+    document.getElementById('los').value = raw[22];
+    document.getElementById('referOutDate').value = formatDateForInput(raw[27]);
+    document.getElementById('referDestination').value = raw[28];
+    document.getElementById('deathDate').value = formatDateForInput(raw[29]);
+
+    // เปลี่ยนไปที่ Tab Form
     new bootstrap.Tab(document.querySelector('button[data-bs-target="#form-pane"]')).show();
+    document.getElementById('formHeader').innerText = "แก้ไขข้อมูล: " + raw[10];
   }
+
+  // ฟังก์ชันช่วยแปลงวันที่จาก DD/MM/YYYY เป็น YYYY-MM-DD เพื่อใส่ใน input type="date"
+  function formatDateForInput(dateStr) {
+    if (!dateStr || !dateStr.includes('/')) return dateStr;
+    const parts = dateStr.split('/');
+    return `${parts[2]}-${parts[1].padStart(2,'0')}-${parts[0].padStart(2,'0')}`;
+  }
+
+  // แก้ไขส่วนการ Submit Form ให้ส่งข้อมูลครบตามที่ .gs ต้องการ
+  document.getElementById('dataForm').addEventListener('submit', async (e) => {
+    e.preventDefault();
+    Swal.fire({ title: 'กำลังบันทึก...', allowOutsideClick: false, didOpen: () => Swal.showLoading() });
+
+    const inType = document.getElementById('inType').value;
+    const formData = {
+      rowId: document.getElementById('rowId').value,
+      seq: document.getElementById('seq').value,
+      patientName: document.getElementById('patientName').value,
+      age: document.getElementById('ageYear').value, // ส่งอายุปีไปก่อน
+      hn: document.getElementById('hn').value,
+      an: document.getElementById('an').value,
+      ward: document.getElementById('ward').value,
+      sithi: document.getElementById('sithi').value,
+      address: document.getElementById('address').value,
+      dcDate: document.getElementById('dcDate').value,
+      admitUnder6: document.getElementById('admitUnder6').value,
+      los: document.getElementById('los').value,
+      referOutDate: document.getElementById('referOutDate').value,
+      referDestination: document.getElementById('referDestination').value,
+      deathDate: document.getElementById('deathDate').value
+    };
+
+    // จัดการวันที่ตามประเภทการรับเข้า
+    if (inType === "รับใหม่") {
+      formData.newMark = document.getElementById('inDate').value;
+      formData.newTime = document.getElementById('inTime').value;
+      formData.newDept = document.getElementById('inDept').value;
+    } else if (inType === "รับย้าย") {
+      formData.transferMark = document.getElementById('inDate').value;
+      formData.transferTime = document.getElementById('inTime').value;
+      formData.transferDept = document.getElementById('inDept').value;
+    } else {
+      formData.referMark = document.getElementById('inDate').value;
+      formData.referTime = document.getElementById('inTime').value;
+      formData.referDept = document.getElementById('inDept').value;
+    }
+
+    try {
+      const result = await callApi('processData', formData);
+      Swal.fire('สำเร็จ', result, 'success');
+      loadDashboard();
+      new bootstrap.Tab(document.querySelector('button[data-bs-target="#list-pane"]')).show();
+    } catch (err) {
+      Swal.fire('ผิดพลาด', err.message, 'error');
+    }
+  });
 
   document.getElementById('dataForm').addEventListener('submit', async (e) => {
     e.preventDefault();
