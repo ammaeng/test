@@ -391,49 +391,60 @@ function populateDropdowns(data) {
   }
 
 function printPDF(item) {
-    // 1. เปิดหน้าต่างใหม่รอไว้ทันทีเพื่อเลี่ยงการโดนบล็อก Pop-up
     const win = window.open("", "_blank");
     if (!win) {
-      Swal.fire('แจ้งเตือน', 'กรุณาอนุญาตให้เบราว์เซอร์เปิด Pop-up เพื่อดู PDF', 'warning');
+      Swal.fire('แจ้งเตือน', 'กรุณาอนุญาตให้เปิด Pop-up', 'warning');
       return;
     }
-    win.document.write('<html><body><p style="font-family:Sarabun">กำลังเตรียมเอกสาร PDF... กรุณารอสักครู่</p></body></html>');
+    win.document.write('<html><body><p style="font-family:Sarabun">กำลังสร้างเอกสารทางการ... กรุณารอสักครู่</p></body></html>');
 
-    Swal.fire({ title: 'กำลังสร้าง PDF...', allowOutsideClick: false, didOpen: () => Swal.showLoading() });
+    Swal.fire({ title: 'กำลังเตรียมข้อมูล PDF...', allowOutsideClick: false, didOpen: () => Swal.showLoading() });
 
     const raw = item.rawData;
+    // สร้าง Object ข้อมูลให้ครบถ้วนตามคอลัมน์ใน Sheet
     const pdfData = { 
-      patientName: raw[10], 
-      hn: raw[12], 
-      an: raw[13], 
-      age: raw[11], 
-      address: raw[30], 
-      dischargeStatus: item.status, 
-      los: raw[22],
-      inType: item.inType || "ไม่ระบุ", 
-      date: item.inDate, 
+      seq: raw[0],
+      inType: item.inType,
+      inDate: raw[1] || raw[4] || raw[7],
+      inTime: raw[2] || raw[5] || raw[8],
+      inDept: raw[3] || raw[6] || raw[9],
+      patientName: raw[10],
+      age: raw[11],
+      hn: raw[12],
+      an: raw[13],
       ward: raw[14],
-      sithi: raw[16], 
-      dx2: raw[18], 
-      seq: raw[0]
+      sai: raw[15],
+      sithi: raw[16],
+      dx1: raw[17],
+      dx2: raw[18],
+      dcDate: raw[19],
+      fu: raw[20],
+      admitUnder6: raw[21],
+      los: raw[22],
+      transferOut: raw[23],
+      transferOutDate: raw[24],
+      abscondDate: raw[25],
+      refuseDate: raw[26],
+      referOutDate: raw[27],
+      referDestination: raw[28],
+      deathDate: raw[29],
+      address: raw[30],
+      status: item.status
     };
 
-    // 2. เรียก API เพื่อสร้าง Base64 ของ PDF
     callApi('createPatientPDF', pdfData).then(base64 => {
       Swal.close();
-      // 3. เขียนข้อมูลลงในหน้าต่างที่เปิดรอไว้
-      win.document.body.innerHTML = ""; // ล้างข้อความ Loading
+      win.document.body.innerHTML = ""; 
       win.document.write(`
-        <title>Patient_Report_${pdfData.hn}</title>
-        <style>body { margin: 0; }</style>
+        <title>สรุปประวัติ_${pdfData.patientName}</title>
+        <style>body { margin: 0; padding: 0; overflow: hidden; }</style>
         <iframe src="data:application/pdf;base64,${base64}" style="width:100%; height:100vh; border:none;"></iframe>
       `);
     }).catch(err => {
       Swal.close();
-      win.close(); // ปิดหน้าต่างที่เปิดรอไว้ถ้าเกิดข้อผิดพลาด
-      Swal.fire('ผิดพลาด', 'ไม่สามารถสร้าง PDF ได้: ' + err.message, 'error');
+      win.close();
+      Swal.fire('ผิดพลาด', err.message, 'error');
     });
-  }
-</script>
+  }</script>
 </body>
 </html>
